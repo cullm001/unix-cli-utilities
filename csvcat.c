@@ -10,37 +10,52 @@ int main(int argc, char *argv[]){
         return 1;
     }
 
-    char row[MAXCHAR];
-    FILE* stream = fopen(argv[1], "r");
+    if (strstr(argv[argc-2],"--bytes=") == NULL){
+        char row[MAXCHAR];
+        FILE* stream = fopen(argv[1], "r");
 
-    if (stream == NULL){
-        printf("Error: file %s not found\n", argv[1]);
-        return 1;
-    }
-
-    char header[1000];
-    fgets(header, MAXCHAR, stream);
-    printf("%s", header);
-    while (feof(stream) != true){
-        fgets(row, MAXCHAR, stream);
-        printf("Row: %s", row);
-    }
-
-    for (int i = 2; i < argc; i++){
-        FILE* stream = fopen(argv[i], "r");
-        fgets(row, MAXCHAR, stream);
-        if (strcmp(header,row) != 0){
-            printf("Error: %s contain different header schema\n", argv[i]);
+        if (stream == NULL){
+            printf("Error: file %s not found\n", argv[1]);
             return 1;
         }
-        while (feof(stream) != true){
-            fgets(row, MAXCHAR, stream);
-            printf("Row: %s", row);
 
+        char header[1000];
+        fgets(header, MAXCHAR, stream);
+        printf("%s", header);
+        while (true){
+            fgets(row, MAXCHAR, stream);
+            if (feof(stream)) break;
+            printf("Row: %s", row);
+        }
+        fclose(stream);
+
+        for (int i = 2; i < argc; i++){
+            FILE* stream = fopen(argv[i], "r");
+            if (stream == NULL){
+                printf("Error: file %s not found\n", argv[1]);
+                return 1;
+            }   
+
+            fgets(row, MAXCHAR, stream);
+            if (strcmp(header,row) != 0){
+                printf("Error: %s contains different header schema\n", argv[i]);
+                return 1;
+            }
+
+            while (true){
+                fgets(row, MAXCHAR, stream);
+                if (feof(stream)) break;
+                printf("Row: %s", row);
+            }
+            fclose(stream);
         }
     }
-    fclose(stream);
+
+    else{
+        printf("Break up into files\n");
+    }
 
 
+    
     return 0;
 }
