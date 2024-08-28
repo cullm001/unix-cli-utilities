@@ -16,10 +16,11 @@ struct threadInfo{
     long long *fileSizes;
     char* header;
     long long fileCap;
-    long long *startingBytes;
+    long long startingByte;
 };
 
 int main(int argc, char *argv[]) {
+    
     if (argc == 1) {
         printf("Error: File argument not passed in\n");
         return 1;
@@ -30,7 +31,7 @@ int main(int argc, char *argv[]) {
     char outdir[30] = "./";
     int threads = 0;
     long long fileCap;
-    const char *files[numCSV];
+    const char **files = malloc(numCSV * sizeof(char*));
 
     for (int i = 1; i < argc; i++) {
         if (strstr(argv[i], "--bytes=") == NULL &&
@@ -39,8 +40,6 @@ int main(int argc, char *argv[]) {
             numCSV++;
         }
     }
-
-    
 
     for (int i = 1; i < argc; i++) {
         if (strstr(argv[i], "--bytes=") != NULL) {
@@ -63,6 +62,7 @@ int main(int argc, char *argv[]) {
             threads = 1;
         } 
         else if (strstr(argv[i], "--outdir=") != NULL) {
+            //check if directory exists
             strncpy(outdir, argv[i] + 9, strlen(argv[i]) - 9);
             outdir[strlen(argv[i]) - 9] = '\0';
         } 
@@ -74,7 +74,6 @@ int main(int argc, char *argv[]) {
         printf("%s ", files[i]);
     }
 
-    printf("Number of Inputted files: %d\n", numCSV);
 
     char row[MAXCHAR];
     char header[MAXCHAR];
@@ -104,16 +103,12 @@ int main(int argc, char *argv[]) {
     
 
     if (strlen(bytes) == 0) {  
-        // printf("%s", header);
-        printf("Line: %s Size: %lu\n", header, strlen(header));
+        printf("%s", header);
         for (int i = 0; i < numCSV; i++) {
             stream = fopen(files[i], "r");
             fgets(row, MAXCHAR, stream); 
             while (fgets(row, MAXCHAR, stream) != NULL) {
-                //printf("%s", row);
-                //int lineSize = strlen(row);
-
-                printf("Line: %s Size: %lu\n", row, strlen(row));
+                printf("%s", row);
             }
             fclose(stream);
         }
@@ -121,7 +116,6 @@ int main(int argc, char *argv[]) {
         printf("Break up into files\n");
 
         
-        //check for directory
         int currentSize = 0;
         int currentInputFile = 1;
         int currentOutputFile = 1;
@@ -175,34 +169,41 @@ int main(int argc, char *argv[]) {
     }
 
     else if (threads == 1){
-        // printf("HELLO\n");
-        //total size of a1l files
         long long totalSize = 0;
         long long* fileSizes = malloc(numCSV * sizeof(long long));
-        FILE* fp ;
+        FILE* fp;
         struct stat st;
         for (int i = 0; i < numCSV; i++){
             stat(files[i], &st);
             totalSize += (st.st_size-strlen(header));
             fileSizes[i] = st.st_size;
-            printf("%lli\n", st.st_size);
         }
 
-
         
-     
+        
+
         fileCap -= strlen(header);
-        int numThreads = 1;
-        int currSize = 0; 
-        long long *startingBytes = malloc(numCSV * sizeof(long));
-        startingBytes[0] = strlen(header); 
+        int numThreads = 0;
+        int currSize = 0;
+        long long *startingBytes = malloc(numCSV * sizeof(long)); 
+        bool startingThread = false;
         for (int i = 0; i < numCSV; i++) {
             stream = fopen(files[i], "r");
+            bool newFile = true;
             fgets(row, MAXCHAR, stream); 
+
             while (fgets(row, MAXCHAR, stream) != NULL) {
                 if (currSize + strlen(row) > fileCap){
-                    startingBytes[numThreads] = currSize + startingBytes[numThreads-1];
+                    if (startingThread){
+                        startingThread = false;
+                        startingBytes[numThreads]=strlen(header);
+                    }
+                    else if (newFile){
+                        currSize += strlen(header);
+                        newFile = false;
+                    }
                     numThreads++;
+                    startingBytes[numThreads] = currSize + startingBytes[numThreads-1];
                     currSize = 0;
                 }
                 currSize+= strlen(row);
@@ -210,6 +211,7 @@ int main(int argc, char *argv[]) {
             }
             fclose(stream);
         }
+        numThreads++;
 
         pthread_t threads[numThreads];
         struct threadInfo threadInfos[numThreads];
@@ -217,7 +219,7 @@ int main(int argc, char *argv[]) {
             
             threadInfos[i].threadNum = i;
             threadInfos[i].outputDir = outdir;
-            threadInfos[i].startingBytes = startingBytes;
+            threadInfos[i].startingByte = startingBytes[i];
             threadInfos[i].inputFiles = files;
             threadInfos[i].numFiles = numCSV;
             threadInfos[i].fileSizes = fileSizes;
@@ -227,18 +229,12 @@ int main(int argc, char *argv[]) {
             pthread_create(&threads[i], NULL, fileWrite, (void*)&threadInfos[i]);
         }
 
-        //printf("THreads created\n");
-        for (int i = 0; i < numThreads; i++) {
+        for (int i = 0; i < numThreads ; i++) {
             pthread_join(threads[i], NULL);
         }
 
         free(startingBytes);
-
-
-        for (int i = 0; i < numThreads; i++) {
-            pthread_join(threads[i], NULL);
-        }
-        
+        free(files);
     }
 
     return 0;
@@ -249,50 +245,46 @@ void* fileWrite(void* arg) {
     struct threadInfo* info = (struct threadInfo*) arg;
     char outputFile[50];
     sprintf(outputFile, "%s/output_%d.csv", info->outputDir, info->threadNum+1);
-
-    long long currentByte = info->startingBytes[info->threadNum];
-
+    int currentFileIndex = 0;
+    long long currentByte = info->startingByte;
+    while (currentFileIndex < info->numFiles && currentByte >= info->fileSizes[currentFileIndex]) {
+        currentByte -= info->fileSizes[currentFileIndex];
+        currentFileIndex++;
+    }
     FILE *ofstream = fopen(outputFile, "w");
     fprintf(ofstream, "%s", info->header);
-
 
     FILE* ifstream;
     char row[MAXCHAR];
     long long currentSize = 0;
 
-    for (int i = 0; i < info->numFiles; i++){
+    for (int i = currentFileIndex; i < info->numFiles; i++){
         
         ifstream=fopen(info->inputFiles[i],"r");
         if (ifstream == NULL) {
-            printf("Error: file %s not found\n", info->inputFiles[i]);
             return NULL;
         }
 
-        fseek(ifstream, currentByte, SEEK_SET);
-
-
+        if (currentSize == 0)
+          fseek(ifstream, currentByte, SEEK_SET);
+        
         while (true){
             if (fgets(row, MAXCHAR, ifstream) == NULL){
                 fclose(ifstream);
                 break;
+            
             }
             if (strlen(row) + currentSize > info->fileCap){
                 fclose(ifstream);
-                break;
+                fclose(ofstream);
+                return NULL;
             }
-            int lineSize = strlen(row);
 
             if (strstr(row, info->header) == NULL){
                 fprintf(ofstream, "%s", row);
                 currentSize += strlen(row);
             }
-
-
-            
         }
-       
-       
-
         
     }
     fclose(ofstream);
