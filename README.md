@@ -17,7 +17,7 @@ xcat *.csv --type=csv --bytes=40K --threads --outdir=/home/ubuntu/workspace
 
 Options:
 --type=<type>                    Type of inputted files (csv,tsv,txt)
---bytes=<size>                   Divides the inputted files into output files of maximum <size> (B,K,M,G)
+--bytes=<size>                   Divides inputted files into files of maximum <size> (B,K,M,G)
 --threads                        Enable multithreading when --bytes option is used   
 --outdir=<output_directory>      The directory where outputted files will be saved           
 ```
