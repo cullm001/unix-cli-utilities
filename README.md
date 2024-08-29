@@ -2,7 +2,7 @@
 A collection of command line utilities designed to simplify data processing tasks in Unix environments
 
 ## xcat
-xcat extends the functionality of the standard Linux cat command by including extra support with handling CSV and TSV files. 
+xcat extends the functionality of the standard Linux cat command by including extra support for handling CSV and TSV files. 
 ### Features
  - Supports .csv, .tsv, and .txt file formats
  - Concatenates multiple files, taking headers into account
