@@ -12,7 +12,9 @@ xcat extends the functionality of the standard Linux cat command by including ex
 ```
 xcat [FILES] [OPTIONS]
 
-Example:
+Examples:
+xcat input_1.csv input_2.csv --type=csv > combined_output_1.csv
+
 xcat *.csv --type=csv --bytes=40K --threads --outdir=/home/ubuntu/workspace
 
 Options:
